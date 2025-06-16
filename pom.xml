@@ -13,15 +13,24 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <commons-codec.version>1.17.1</commons-codec.version>
+        <commons-codec.version>1.17.2</commons-codec.version>
+        <commons-collections4.version>4.5.0-M3</commons-collections4.version>
         <commons-io.version>2.16.1</commons-io.version>
         <commons-lang3.version>3.17.0</commons-lang3.version>
         <jakarta.xml.version>4.0.2</jakarta.xml.version>
         <jaxb-runtime.version>4.0.5</jaxb-runtime.version>
-        <logback-classic.version>1.5.7</logback-classic.version>
-        <lombok.version>1.18.34</lombok.version>
+        <jdom2.version>2.0.6.1</jdom2.version>
+        <logback-classic.version>1.5.18</logback-classic.version>
+        <lombok.version>1.18.38</lombok.version>
+        <plexus-utils.version>4.0.2</plexus-utils.version>
+        <plexus-xml.version>4.0.4</plexus-xml.version>
+
+        <dependency-check-maven.version>10.0.4</dependency-check-maven.version>
+        <exec-maven-plugin.version>3.4.1</exec-maven-plugin.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-        <maven-model.version>3.9.9</maven-model.version>
+        <maven-help-plugin.version>3.5.0</maven-help-plugin.version>
+        <maven-model.version>3.9.10</maven-model.version>
+        <maven-resolver-api.version>2.0.9</maven-resolver-api.version>
     </properties>
 
     <dependencies>
@@ -42,6 +51,12 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>${commons-lang3.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>${commons-collections4.version}</version>
         </dependency>
 
         <dependency>
@@ -73,10 +88,79 @@
             <artifactId>maven-model</artifactId>
             <version>${maven-model.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-core</artifactId>
+            <version>${maven-model.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-api</artifactId>
+            <version>${maven-resolver-api.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jdom</groupId>
+            <artifactId>jdom2</artifactId>
+            <version>${jdom2.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>${plexus-utils.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-xml</artifactId>
+            <version>${plexus-xml.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-help-plugin</artifactId>
+                <version>${maven-help-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-effective-pom</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>effective-pom</goal>
+                        </goals>
+                        <configuration>
+<!--                            uncomment the artifact entry to generate a file with the effective pom-->
+<!--                            <artifact>com.workhuman.integration.grs:grs-fulfilment-intgr-app:1.0.1</artifact>-->
+                            <output>target/effective-pom.xml</output>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${exec-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-jakarta-classes</id>
+                        <phase>process-classes</phase><!-- Execute after compile phase -->
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>org.flunadela.depsvers.MavenUpgradeableDependencies</mainClass>
+                            <arguments>
+                                <argument>target/effective-pom.xml</argument><!-- pomFileToParse -->
+                                <argument>showOnlyLatestVersion</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -95,7 +179,7 @@
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>10.0.4</version>
+                <version>${dependency-check-maven.version}</version>
                 <configuration>
                     <skip>true</skip>
                     <skipProvidedScope>true</skipProvidedScope>

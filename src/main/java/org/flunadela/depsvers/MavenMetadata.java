@@ -8,12 +8,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamReader;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.Collections;
 
 @Getter
 public class MavenMetadata {
@@ -23,7 +24,7 @@ public class MavenMetadata {
     private static final String METADATA_FILE_NAME = "maven-metadata.xml";
 
     private final String repoBaseUrl;
-    private String minVersion;
+    private String pomMinVersion;
 
     public MavenMetadata(String repoBaseUrl) {
         this.repoBaseUrl = StringUtils.removeEnd(repoBaseUrl, "/");
@@ -31,15 +32,15 @@ public class MavenMetadata {
 
     public MavenMetadataVersioning getArtifactMetadata(String groupId,
                                                        String artifactId,
-                                                       String minVersion) {
-        this.minVersion = StringUtils.trimToNull(minVersion);
-        InputStream input = null;
+                                                       String pomMinVersion) {
+        this.pomMinVersion = StringUtils.trimToNull(pomMinVersion);
+        InputStream xmlInput = null;
 
         try {
             String artifactUrl = getRepoBaseUrl() + "/" + StringUtils.replace(groupId, ".", "/") + "/" + artifactId + "/" + METADATA_FILE_NAME;
             URL url = URI.create(artifactUrl).toURL();
             URLConnection conn = url.openConnection();
-            input = conn.getInputStream();
+            xmlInput = conn.getInputStream();
 
             Thread currentThread = Thread.currentThread();
             ClassLoader originalContext = currentThread.getContextClassLoader();
@@ -48,22 +49,28 @@ public class MavenMetadata {
                 currentThread.setContextClassLoader(MavenMetadata.class.getClassLoader());
                 JAXBContext context = JAXBContext.newInstance(MavenMetadataVersioning.class);
                 Unmarshaller unmarshaller = context.createUnmarshaller();
-                MavenMetadataVersioning metadata = (MavenMetadataVersioning) unmarshaller.unmarshal(input);
-                Collections.reverse(metadata.versioning.versions);
-                removeVersionsLowerThan(metadata, minVersion);
+
+                // Disable XXE by configuring the underlying XMLInputFactory
+                XMLInputFactory xif = XMLInputFactory.newFactory();
+                xif.setProperty(XMLInputFactory.SUPPORT_DTD, false); // Disallow DTDs
+                xif.setProperty("javax.xml.stream.isSupportingExternalEntities", false); // Disallow external entities
+
+                XMLStreamReader xsr = xif.createXMLStreamReader(xmlInput);
+                MavenMetadataVersioning metadata = (MavenMetadataVersioning) unmarshaller.unmarshal(xsr);
+                removeVersionsLowerThan(metadata, pomMinVersion);
 
                 return metadata;
             } finally {
                 currentThread.setContextClassLoader(originalContext);
             }
         } catch (FileNotFoundException fnfe) {
-            LOGGER.warn("Could not find maven-metadata.xml for artifact: {} {}", groupId, artifactId);
+            LOGGER.warn("Could not find maven-metadata.xml for {} : {}", groupId, artifactId);
             return null;
         } catch (Exception e) {
             LOGGER.warn("Could not parse maven-metadata.xml", e);
             return null;
         } finally {
-            IOUtils.closeQuietly(input);
+            IOUtils.closeQuietly(xmlInput);
         }
     }
 
@@ -76,25 +83,36 @@ public class MavenMetadata {
     }
 
     private boolean isVersionLowerThan(String version) {
-        if (StringUtils.isBlank(minVersion)) {
+        if (StringUtils.isBlank(pomMinVersion)) {
             return false;
         }
 
-        String[] minVers = StringUtils.split(minVersion, ".");
+        String[] minVers = StringUtils.split(pomMinVersion, ".");
         String[] vers = StringUtils.split(version, ".");
 
-        for (int i = 0; i < vers.length; i++) {
-            if (i >= minVers.length) {
+        int parts = Math.max(minVers.length, vers.length);
+
+        for (int i = 0; i < parts; i++) {
+            if (i >= minVers.length) { // case when version has more parts than minVersion
                 return false;
             }
 
-            if (StringUtils.isNumeric(vers[i]) && (!StringUtils.isAlphaSpace(vers[i]) || !StringUtils.contains(vers[i], "-"))) {
-                int compRes = Integer.parseInt(vers[i]) - Integer.parseInt(minVers[i]);
+            String v;
+            if (i > vers.length - 1) { // case when minVersion has more parts than version
+                v = "0";
+            } else {
+                v = vers[i];
+            }
+
+            String minV = minVers[i];
+
+            if (StringUtils.isNumeric(v) && (!StringUtils.isAlphaSpace(v) || !StringUtils.contains(v, "-")) && StringUtils.isNumeric(minV)) {
+                int compRes = Integer.parseInt(v) - Integer.parseInt(minV);
                 if (compRes < 0) {
                     return true;
                 }
             } else {
-                int compRes = vers[i].compareTo(minVers[i]);
+                int compRes = v.compareTo(minV);
                 if (compRes < 0) {
                     return true;
                 }

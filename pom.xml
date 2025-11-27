@@ -16,12 +16,12 @@
         <commons-codec.version>1.17.2</commons-codec.version>
         <commons-collections4.version>4.5.0-M3</commons-collections4.version>
         <commons-io.version>2.16.1</commons-io.version>
-        <commons-lang3.version>3.17.0</commons-lang3.version>
-        <jakarta.xml.version>4.0.2</jakarta.xml.version>
-        <jaxb-runtime.version>4.0.5</jaxb-runtime.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
+        <jakarta.xml.version>4.0.4</jakarta.xml.version>
+        <jaxb-runtime.version>4.0.6</jaxb-runtime.version>
         <jdom2.version>2.0.6.1</jdom2.version>
-        <logback-classic.version>1.5.18</logback-classic.version>
-        <lombok.version>1.18.38</lombok.version>
+        <logback-classic.version>1.5.21</logback-classic.version>
+        <lombok.version>1.18.42</lombok.version>
         <plexus-utils.version>4.0.2</plexus-utils.version>
         <plexus-xml.version>4.0.4</plexus-xml.version>
 
@@ -29,8 +29,8 @@
         <exec-maven-plugin.version>3.4.1</exec-maven-plugin.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-help-plugin.version>3.5.0</maven-help-plugin.version>
-        <maven-model.version>3.9.10</maven-model.version>
-        <maven-resolver-api.version>2.0.9</maven-resolver-api.version>
+        <maven-model.version>3.9.11</maven-model.version>
+        <maven-resolver-api.version>2.0.13</maven-resolver-api.version>
     </properties>
 
     <dependencies>

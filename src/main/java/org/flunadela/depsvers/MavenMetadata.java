@@ -5,6 +5,7 @@ import jakarta.xml.bind.Unmarshaller;
 import lombok.Getter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ public class MavenMetadata {
     private String pomMinVersion;
 
     public MavenMetadata(String repoBaseUrl) {
-        this.repoBaseUrl = StringUtils.removeEnd(repoBaseUrl, "/");
+        this.repoBaseUrl = Strings.CS.removeEnd(repoBaseUrl, "/");
     }
 
     public MavenMetadataVersioning getArtifactMetadata(String groupId,
@@ -37,7 +38,7 @@ public class MavenMetadata {
         InputStream xmlInput = null;
 
         try {
-            String artifactUrl = getRepoBaseUrl() + "/" + StringUtils.replace(groupId, ".", "/") + "/" + artifactId + "/" + METADATA_FILE_NAME;
+            String artifactUrl = getRepoBaseUrl() + "/" + Strings.CS.replace(groupId, ".", "/") + "/" + artifactId + "/" + METADATA_FILE_NAME;
             URL url = URI.create(artifactUrl).toURL();
             URLConnection conn = url.openConnection();
             xmlInput = conn.getInputStream();
@@ -106,7 +107,7 @@ public class MavenMetadata {
 
             String minV = minVers[i];
 
-            if (StringUtils.isNumeric(v) && (!StringUtils.isAlphaSpace(v) || !StringUtils.contains(v, "-")) && StringUtils.isNumeric(minV)) {
+            if (StringUtils.isNumeric(v) && (!StringUtils.isAlphaSpace(v) || !Strings.CS.contains(v, "-")) && StringUtils.isNumeric(minV)) {
                 int compRes = Integer.parseInt(v) - Integer.parseInt(minV);
                 if (compRes < 0) {
                     return true;

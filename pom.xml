@@ -13,6 +13,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+        <!-- External dependencies versions -->
         <commons-codec.version>1.17.2</commons-codec.version>
         <commons-collections4.version>4.5.0-M3</commons-collections4.version>
         <commons-io.version>2.16.1</commons-io.version>
@@ -22,15 +23,19 @@
         <jdom2.version>2.0.6.1</jdom2.version>
         <logback-classic.version>1.5.21</logback-classic.version>
         <lombok.version>1.18.42</lombok.version>
+        <picocli.version>4.7.7</picocli.version>
         <plexus-utils.version>4.0.2</plexus-utils.version>
         <plexus-xml.version>4.0.4</plexus-xml.version>
 
-        <dependency-check-maven.version>10.0.4</dependency-check-maven.version>
-        <exec-maven-plugin.version>3.4.1</exec-maven-plugin.version>
-        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-        <maven-help-plugin.version>3.5.0</maven-help-plugin.version>
-        <maven-model.version>3.9.11</maven-model.version>
-        <maven-resolver-api.version>2.0.13</maven-resolver-api.version>
+        <!-- Maven model version handled by this project -->
+        <maven.version>3.9.11</maven.version>
+        <maven.resolver.version>1.9.24</maven.resolver.version>
+
+        <!-- Plugin versions -->
+        <dependency-check-maven-plugin.version>12.1.9</dependency-check-maven-plugin.version>
+        <exec-maven-plugin.version>3.6.2</exec-maven-plugin.version>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <maven-help-plugin.version>3.5.1</maven-help-plugin.version>
     </properties>
 
     <dependencies>
@@ -85,18 +90,48 @@
 
         <dependency>
             <groupId>org.apache.maven</groupId>
-            <artifactId>maven-model</artifactId>
-            <version>${maven-model.version}</version>
+            <artifactId>maven-core</artifactId>
+            <version>${maven.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
-            <artifactId>maven-core</artifactId>
-            <version>${maven-model.version}</version>
+            <artifactId>maven-settings-builder</artifactId>
+            <version>${maven.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-supplier</artifactId>
+            <version>${maven.resolver.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven.resolver</groupId>
             <artifactId>maven-resolver-api</artifactId>
-            <version>${maven-resolver-api.version}</version>
+            <version>${maven.resolver.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-util</artifactId>
+            <version>${maven.resolver.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-impl</artifactId>
+            <version>${maven.resolver.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-connector-basic</artifactId>
+            <version>${maven.resolver.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-transport-http</artifactId>
+            <version>${maven.resolver.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.resolver</groupId>
+            <artifactId>maven-resolver-transport-file</artifactId>
+            <version>${maven.resolver.version}</version>
         </dependency>
 
         <dependency>
@@ -115,6 +150,36 @@
             <artifactId>plexus-xml</artifactId>
             <version>${plexus-xml.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-impl</artifactId>
+            <version>1.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-connector-basic</artifactId>
+            <version>1.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-transport-file</artifactId>
+            <version>1.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.aether</groupId>
+            <artifactId>aether-transport-http</artifactId>
+            <version>1.1.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -131,8 +196,8 @@
                             <goal>effective-pom</goal>
                         </goals>
                         <configuration>
-<!--                            uncomment the artifact entry to generate a file with the effective pom-->
-<!--                            <artifact>com.workhuman.integration.grs:grs-fulfilment-intgr-app:1.0.1</artifact>-->
+                            <!--                            uncomment the artifact entry to generate a file with the effective pom-->
+                            <!--                            <artifact>com.workhuman.integration.grs:grs-fulfilment-intgr-app:1.0.1</artifact>-->
                             <output>target/effective-pom.xml</output>
                         </configuration>
                     </execution>
@@ -179,7 +244,7 @@
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>${dependency-check-maven.version}</version>
+                <version>${dependency-check-maven-plugin.version}</version>
                 <configuration>
                     <skip>true</skip>
                     <skipProvidedScope>true</skipProvidedScope>

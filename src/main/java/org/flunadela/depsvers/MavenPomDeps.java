@@ -1,57 +1,62 @@
 package org.flunadela.depsvers;
 
-import java.io.FileNotFoundException;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.FileSystems;
-import java.util.Hashtable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.Model;
-import org.apache.maven.model.Parent;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
 
 public class MavenPomDeps {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MavenPomDeps.class);
 
     public static final String SKIP = "SKIP: ";
-    public static final String RANGE_SKIP = SKIP + "RANGE SKIPPED";
     public static final String PROPERTY_UNDEFINED = SKIP + "PROPERTY UNDEFINED";
     public static final String UNDEFINED = SKIP + "UNDEFINED";
     public static final String UNRECOGNIZED = SKIP + "NOT RECOGNIZED";
 
     public static final String SYSTEM_FILE_SEPARATOR = FileSystems.getDefault().getSeparator();
 
-    private final MavenMetadata mavenMetadata = new MavenMetadata("https://repo.maven.apache.org/maven2");
+    private final MavenMetadata mavenMetadata = new MavenMetadata();
 
-    public Map<String, List<String>> getVersionsTree(String pomFileToParse) throws XmlPullParserException, IOException {
+    public Map<String, List<String>> getVersionsTree(String pomFileToParse, boolean useSettings) throws XmlPullParserException, IOException {
         TreeMap<String, List<String>> versionsTree = new TreeMap<>();
+
+        List<String> repositoriesUrls;
+
+        if (useSettings) {
+            repositoriesUrls = SettingsHandler.getReleaseRepositoriesUrls();
+        } else {
+            repositoriesUrls = new ArrayList<>();
+        }
 
         List<DependencyEntry> deps = parsePom(pomFileToParse);
 
         // collect the list of versions for each dependency
         deps.forEach(dep -> {
             if (dep.version().startsWith(SKIP)) {
-                LOGGER.info("Not treated {} {}", dep.artifactId(), dep.version());
+//                LOGGER.info("Not treated as it may be defined by a BOM {}", dep.artifactId()); // BOMs will not be treated here
                 return;
             }
             MavenMetadataVersioning meta = mavenMetadata.getArtifactMetadata(
                     dep.groupId(),
                     dep.artifactId(),
-                    dep.version());
+                    dep.version(),
+                    useSettings,
+                    repositoriesUrls);
 
             if (meta != null) {
                 versionsTree.put(dep.groupId() + ":" + dep.artifactId(), meta.versioning.versions);
@@ -74,7 +79,7 @@ public class MavenPomDeps {
                 pomDepsInMgmt = pomDepMgmt.getDependencies();
             }
 
-            return getDeps(pomDepsInMgmt, pomModel.getDependencies(), getAllProperties(pomModel, fileFullPath));
+            return getDeps(pomDepsInMgmt, pomModel.getDependencies(), getAllProperties(pomModel, fileFullPath), pomModel);
         }
     }
 
@@ -116,7 +121,7 @@ public class MavenPomDeps {
         return allProps;
     }
 
-    private List<DependencyEntry> getDeps(List<Dependency> pomDepsInMgmt, List<Dependency> dependencies, Properties pomProps) {
+    private List<DependencyEntry> getDeps(List<Dependency> pomDepsInMgmt, List<Dependency> dependencies, Properties pomProps, Model currentPom) {
         List<DependencyEntry> allDeps = new ArrayList<>();
 
         if (pomDepsInMgmt != null) {
@@ -124,7 +129,7 @@ public class MavenPomDeps {
                     allDeps.add(new DependencyEntry(
                             dep.getGroupId(),
                             dep.getArtifactId(),
-                            resolveVersion(pomProps, dep.getVersion()))));
+                            resolveVersion(pomProps, dep.getVersion(), currentPom))));
         }
 
         if (dependencies != null) {
@@ -132,7 +137,7 @@ public class MavenPomDeps {
                 DependencyEntry de = new DependencyEntry(
                         dep.getGroupId(),
                         dep.getArtifactId(),
-                        resolveVersion(pomProps, dep.getVersion()));
+                        resolveVersion(pomProps, dep.getVersion(), currentPom));
 
                 if (!allDeps.contains(de)) {
                     allDeps.add(de);
@@ -143,24 +148,47 @@ public class MavenPomDeps {
         return allDeps;
     }
 
-    // TODO: enhance version resolution
-    private String resolveVersion(Properties pomProps, String version) {
+    private String resolveVersion(Properties pomProps, String version, Model currentPom) {
         if (version == null) {
             return UNDEFINED; // version may be defined in parent POM or some BOM import
 
         } else if (version.contains(",")) {
-            return RANGE_SKIP;
+            return handleVersionRanges(version);
 
         } else if (version.startsWith("${") && version.endsWith("}")) { // property reference
-            String propName = version.substring(2, version.length() - 1);
-            String propValue = pomProps.getProperty(propName);
-
-            return Objects.requireNonNullElse(propValue, PROPERTY_UNDEFINED + ": " + version);
+            return handleVersionsInProperty(pomProps, version, currentPom);
 
         } else if (StringUtils.isNumeric(version) || Strings.CS.contains(version, ".")) {
             return version;
         }
 
         return UNRECOGNIZED + ": " + version;
+    }
+
+    private String handleVersionRanges(String version) {
+        // return latest from the range, e.g. [1.0,2.0) -> 2.0
+        // TODO: improve handling of version ranges as this doesn't cover all cases
+        String rangeVersion = StringUtils.substringAfterLast(StringUtils.substringBeforeLast(version, ")"), ",").trim();
+        if (StringUtils.isNumeric(rangeVersion) || Strings.CS.contains(rangeVersion, ".")) {
+            return rangeVersion;
+        }
+        return UNRECOGNIZED + ": " + version;
+    }
+
+    private String handleVersionsInProperty(Properties pomProps, String version, Model currentPom) {
+        String propName = version.substring(2, version.length() - 1);
+        String propValue = pomProps.getProperty(propName);
+
+        if ("project.version".equals(propName) || "pom.version".equals(propName)) {
+            propValue = currentPom.getVersion();
+        } else if ("project.parent.version".equals(propName) || "pom.parent.version".equals(propName)) {
+            if (currentPom.getParent() != null) {
+                propValue = currentPom.getParent().getVersion();
+            } else {
+                propValue = null;
+            }
+        }
+
+        return Objects.requireNonNullElse(propValue, PROPERTY_UNDEFINED + ": " + version);
     }
 }

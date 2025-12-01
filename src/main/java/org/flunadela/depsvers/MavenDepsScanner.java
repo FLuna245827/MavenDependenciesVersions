@@ -3,6 +3,7 @@ package org.flunadela.depsvers;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +11,7 @@ import org.slf4j.LoggerFactory;
 public class MavenDepsScanner {
     private static final Logger LOGGER = LoggerFactory.getLogger(MavenDepsScanner.class);
 
-    public void scan(String pomFileToParse, final boolean showOnlyLatestArg) {
+    public void scan(String pomFileToParse, boolean useXmlSettings, boolean showOnlyLatest) {
         MavenPomDeps mavenPomDeps = new MavenPomDeps();
 
         try {
@@ -26,7 +27,8 @@ public class MavenDepsScanner {
                 return;
             }
 
-            displayResults(mavenPomDeps.getVersionsTree(pomFileToParse), showOnlyLatestArg);
+            // process the POM file and get the versions tree for the dependencies
+            displayResults(mavenPomDeps.getVersionsTree(pomFileToParse, useXmlSettings), showOnlyLatest);
 
         } catch (Exception e) {
             LOGGER.error("Exception produced", e);
@@ -34,6 +36,8 @@ public class MavenDepsScanner {
     }
 
     private void displayResults(Map<String, List<String>> versionsTree, final boolean showOnlyLatestArg) {
+        AtomicInteger counter = new AtomicInteger();
+
         versionsTree.forEach((artifact, upVersionslist) -> {
             if (!CollectionUtils.isEmpty(upVersionslist)) {
                 String actualVersion = upVersionslist.getFirst();
@@ -45,8 +49,13 @@ public class MavenDepsScanner {
                     } else {
                         LOGGER.info("ALL UP VERSIONS {} : {} -> {}", artifact, actualVersion, upVersionslist);
                     }
+                    counter.getAndIncrement();
                 }
             }
         });
+
+        if (counter.get() == 0) {
+            LOGGER.info("No dependencies found having newer versions. All is up to date.");
+        }
     }
 }

@@ -2,43 +2,66 @@ package org.flunadela.depsvers;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.Unmarshaller;
-import lombok.Getter;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.List;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamReader;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamReader;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLConnection;
-
-@Getter
 public class MavenMetadata {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MavenMetadata.class);
 
+    public static final String MAIN_REPO_URL = "https://repo.maven.apache.org/maven2";
     private static final String METADATA_FILE_NAME = "maven-metadata.xml";
 
-    private final String repoBaseUrl;
     private String pomMinVersion;
-
-    public MavenMetadata(String repoBaseUrl) {
-        this.repoBaseUrl = Strings.CS.removeEnd(repoBaseUrl, "/");
-    }
 
     public MavenMetadataVersioning getArtifactMetadata(String groupId,
                                                        String artifactId,
-                                                       String pomMinVersion) {
-        this.pomMinVersion = StringUtils.trimToNull(pomMinVersion);
+                                                       String pomMinVer,
+                                                       boolean useXmlSettings,
+                                                       List<String> additionalRepoUrls) {
+        pomMinVersion = StringUtils.trimToNull(pomMinVer);
+
+        MavenMetadataVersioning meta = fetchMetadataFromRepo(groupId, artifactId, MAIN_REPO_URL, pomMinVersion);
+
+        if (meta != null) {
+            return meta;
+
+        } else if (useXmlSettings) {
+            for (String repoUrl : additionalRepoUrls) {
+                MavenMetadataVersioning metadata = fetchMetadataFromRepo(groupId, artifactId, repoUrl, pomMinVersion);
+
+                if (metadata != null) {
+                    return metadata;
+                }
+            }
+
+            LOGGER.warn("Could not find metadata for {} : {} in any repository", groupId, artifactId);
+        }
+
+        return null;
+    }
+
+    private MavenMetadataVersioning fetchMetadataFromRepo(String groupId, String artifactId,
+                                                          String repoBaseUrl, String pomMinVersion) {
         InputStream xmlInput = null;
+        String artifactUrl = null;
 
         try {
-            String artifactUrl = getRepoBaseUrl() + "/" + Strings.CS.replace(groupId, ".", "/") + "/" + artifactId + "/" + METADATA_FILE_NAME;
+            artifactUrl = Strings.CS.removeEnd(repoBaseUrl, "/") + "/" +
+                    Strings.CS.replace(groupId, ".", "/") + "/" +
+                    artifactId + "/" +
+                    METADATA_FILE_NAME;
             URL url = URI.create(artifactUrl).toURL();
             URLConnection conn = url.openConnection();
             xmlInput = conn.getInputStream();
@@ -65,13 +88,14 @@ public class MavenMetadata {
                 currentThread.setContextClassLoader(originalContext);
             }
         } catch (FileNotFoundException fnfe) {
-            LOGGER.warn("Could not find maven-metadata.xml for {} : {}", groupId, artifactId);
             return null;
         } catch (Exception e) {
             LOGGER.warn("Could not parse maven-metadata.xml", e);
             return null;
         } finally {
-            IOUtils.closeQuietly(xmlInput);
+            if (xmlInput != null) {
+                IOUtils.closeQuietly(xmlInput);
+            }
         }
     }
 
